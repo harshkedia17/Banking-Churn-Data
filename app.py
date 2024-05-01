@@ -1,3 +1,4 @@
+import joblib
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -93,44 +94,42 @@ elif nav_option == "Data Analysis":
         st.pyplot(fig)
 
 elif nav_option == "Prediction":
-
+    selected_model = None
     col1, col2, = st.columns(2)
 
     button_width = 350
     button_height = 50
     hover_color = "#9EFFF7"
 
+    button_style = f"""
+    <style>
+    div.stButton > button {{
+        width: {button_width}px;
+        height: {button_height}px;
+        border: 2px solid transparent; /* Set initial border */
+    }}
+    div.stButton > button:hover {{
+        border: 2px solid {hover_color}; /* Change border color on hover */
+    }}
+    </style>
+    """
+
+    if 'selected_model' not in st.session_state:
+        st.session_state['selected_model'] = None
+
     with col1:
-        st.write("""
-        <style>
-        div.stButton > button {
-            width: """ + str(button_width) + """px;
-            height: """ + str(button_height) + """px;
-            border: 2px solid transparent; /* Set initial border */
-        }
-        div.stButton > button:hover {
-            border: 2px solid """ + hover_color + """; /* Change border color on hover */
-        }
-        </style>
-        """, unsafe_allow_html=True)
+        st.write(button_style, unsafe_allow_html=True)
         if st.button("Logistic Regression"):
-            selected_model = 'Logistic Regression'
+            st.session_state['selected_model'] = './LogisticRegression_pipeline.pkl'
+        if st.button("K-Nearest Neighbors"):
+            st.session_state['selected_model'] = './KNeighborsClassifier_pipeline.pkl'
 
     with col2:
-        st.write("""
-        <style>
-        div.stButton > button {
-            width: """ + str(button_width) + """px;
-            height: """ + str(button_height) + """px;
-            border: 2px solid transparent; /* Set initial border */
-        }
-        div.stButton > button:hover {
-            border: 2px solid """ + hover_color + """; /* Change border color on hover */
-        }
-        </style>
-        """, unsafe_allow_html=True)
+        st.write(button_style, unsafe_allow_html=True)
         if st.button("Random Forest"):
-            selected_model = 'Random Forest'
+            st.session_state['selected_model'] = './RandomForestClassifier_pipeline.pkl'
+        if st.button("Support Vector Classifier"):
+            st.session_state['selected_model'] = './SVC_pipeline.pkl'
 
     title = """
     <h1 style='text-align: center; color: #D4E6F1; font-size: 36px;'>Provide Input</h1>
@@ -141,7 +140,7 @@ elif nav_option == "Prediction":
     col1, col2 = st.columns(2)
 
     with col1:
-        input1 = st.number_input("Credit Score:")
+        credit_score = st.number_input("Credit Score:")
         options = ['MALE', 'FEMALE']
         selected_option_gender = st.selectbox("Gender", options)
         options = ['Spain', 'France', 'Germany']
@@ -149,27 +148,44 @@ elif nav_option == "Prediction":
         balance = st.number_input("Balance:")
         numofProducts = st.number_input("NumOfProducts:")
 
-        # input3 = st.text_input("Gender:")
     with col2:
-        input4 = st.number_input("Age:")
-        input5 = st.number_input("Salary:")
-        input6 = st.number_input("Tenure:")
+        age = st.number_input("Age:")
+        estimatedSalary = st.number_input("Salary:")
+        tenure = st.number_input("Tenure:")
         isActiveMember = st.selectbox("IsActiveMember", [0, 1])
-        estimatedSalary = st.number_input("EstimatedSalary:")
+        hasCrCard = st.selectbox("Do you have Credit Card?", [0, 1])
     with st.expander("User Inputs"):
+        col1, col2 = st.columns(2)
         with col1:
-            st.write(f"Credit Score: {input1}")
+            st.write(f"Credit Score: {credit_score}")
             st.write(f"Geography: {selected_option_geography}")
             st.write("Gender:", selected_option_gender)
             st.write(f"Balance: {balance}")
             st.write(f"NumOfProducts: {numofProducts}")
         with col2:
-            st.write(f"Age: {input4}")
-            st.write(f"Salary: {input5}")
-            st.write(f"Tenure: {input6}")
+            st.write(f"Age: {age}")
+            st.write(f"Tenure: {tenure}")
             st.write(f"IsActiveMember: {isActiveMember}")
             st.write(f"EstimatedSalary: {estimatedSalary}")
-
+            st.write(f"Do you have a Credit Card: {hasCrCard}")
     if st.button("PREDICT"):
-        pass
-        st.write("predicted value is")
+        selected_model_path = st.session_state.get('selected_model')
+        if selected_model_path is not None:
+            model = joblib.load(selected_model_path)
+            input_data = pd.DataFrame({
+                'CreditScore': [credit_score],
+                'Geography': [selected_option_geography],
+                'Gender': [selected_option_gender],
+                'Age': [age],
+                'Tenure': [tenure],
+                'Balance': [balance],
+                'NumOfProducts': [numofProducts],
+                'HasCrCard': [hasCrCard],
+                'IsActiveMember': [isActiveMember],
+                'EstimatedSalary': [estimatedSalary]
+            })
+            prediction = model.predict(input_data)
+            prediction_text = f"Prediction: <span style='font-size:24px; color:#2ecc71; font-weight:bold;'>{'Churn' if prediction[0] == 1 else 'No Churn'}</span>"
+            st.markdown(prediction_text, unsafe_allow_html=True)
+        else:
+            st.error("Please select a model before predicting.")
